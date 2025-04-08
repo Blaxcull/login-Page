@@ -1,4 +1,6 @@
 const express = require("express");
+const bcrypt  = require('bcryptjs')
+
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const authenticateToken = require("./middleware/auth");
@@ -278,11 +280,15 @@ connection.query(checkEmail, [email], (err, result) => {
 })
 
 
-app.post("/verify-otp", (req, res) => {
+app.post("/verify-otp", async(req, res) => {
     console.log("hello post")
     const { name, email, password } = req.body;
+const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+
 const sql = "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
-connection.query(sql, [name, email, password], (err, result) => {
+connection.query(sql, [name,email, hashedPassword], (err, result) => {
     if (err) {
         console.error("Error inserting data:", err);
         return res.status(500).json({ error: "Database error" });
@@ -302,12 +308,14 @@ connection.query(sql, [name, email, password], (err, result) => {
 });
 
 
-app.post('/changePass',(req,res)=>{
+app.post('/changePass',async(req,res)=>{
 
     const{email_text,password} = req.body;
 
 const checkEmail = "SELECT * FROM users WHERE email = ?";
 const updatePassword = "UPDATE users SET password = ? WHERE email = ?";
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
 
 connection.query(checkEmail, [email_text], (err, result) => {
     if (err) {
@@ -319,7 +327,7 @@ connection.query(checkEmail, [email_text], (err, result) => {
         return res.json({ status: "Email not found" });
     }
 
-    connection.query(updatePassword, [password, email_text], (err, updateResult) => {
+    connection.query(updatePassword, [hashedPassword, email_text], (err, updateResult) => {
         if (err) {
             console.log("Error updating password");
             return res.status(500).json({ error: "Failed to update password" });
@@ -377,7 +385,8 @@ connection.query(checkemail, [email_value], (err, result) => {
 
 
     let user = result[0];
-    if(password_value !==user.password){
+
+    if(!bcrypt.compare(password_value, user.password)){
 
         console.log('incorrect password')
         return res.json({ status: "Incorrect password" });
